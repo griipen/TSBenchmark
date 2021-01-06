@@ -23,11 +23,11 @@ pmat = data.frame( # Input: Nx2 data.frame (date, price)
     price = spot * exp(cumsum((r - 0.5 * sigma**2) * 1/N + (sigma * (sqrt(1/N)) * rnorm(N, mean = 0, sd = 1))))
 )
 
-      # 1. xts + TTR
+      # 1. xts
       xtsfun = function(mat){
-          xtsdf = as.xts(mat[, 2], order.by = mat[, 1])
-          dailyRet = ROC(xtsdf, type = 'discrete', na.pad = F) # same as xtsdf/lag.xts(xtsdf, na.pad = F) - 1
-          apply.monthly(dailyRet, function(x) tail(cumprod(x + 1) - 1, 1))
+        xtsdf = as.xts(mat[, 2], order.by = mat[, 1])
+        dailyRet = xtsdf/lag.xts(xtsdf, na.pad = F) - 1
+        apply.monthly(dailyRet, function(x) tail(cumprod(x + 1) - 1, 1))
       }
       
       # 2. quantmod (black box external function)
@@ -54,12 +54,14 @@ library(microbenchmark)
 gc()
 
 mbm = microbenchmark(
-  data.table = dtfun(pmat),
+  xts = xtsfun(pmat),
   quantmod = qmfun(pmat),
-  xtsTTR = xtsfun(pmat),
+  data.table = dtfun(pmat),
   times = 200
 )
 
 mbm
-autoplot(mbm, log = F)
 
+png('benchmark.png', width = 750, height = 350)
+autoplot(mbm, log = F)
+dev.off()
