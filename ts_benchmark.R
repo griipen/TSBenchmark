@@ -1,7 +1,7 @@
 # Simple return exercise: Daily Prices to Monthly Returns
 # Input: Nx2 data.frame with columns (day, price) 
 # Output: Nx2 object with columns (month, return)
-# Three different functions: 1. xts/TTR, 2. quantmod, 3. data.table
+# Three different functions: 1. xts, 2. data.table, 3. quantmod
 
 rm(list = ls()); gc()
 
@@ -17,10 +17,13 @@ r = 0.01
 sigma = 0.02
 N = 1e6
 
-pmat = data.frame( # Input: Nx2 data.frame (date, price)
+# Input data: Nx2 data.frame (date, price)
+pmat = data.frame( 
     date = seq.Date(as.Date('1970-01-01'), by = 1, length.out = N),
     price = spot * exp(cumsum((r - 0.5 * sigma**2) * 1/N + (sigma * (sqrt(1/N)) * rnorm(N, mean = 0, sd = 1))))
 )
+
+# Output functions
 
       # 1. xts standalone function
       xtsfun = function(mat){
