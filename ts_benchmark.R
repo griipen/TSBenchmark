@@ -15,7 +15,7 @@ library(quantmod)
 spot = 100
 r = 0.01
 sigma = 0.02
-N = 1e5
+N = 1e6
 
 pmat = data.frame( # Input: Nx2 data.frame (date, price)
     date = seq.Date(as.Date('1970-01-01'), by = 1, length.out = N),
@@ -33,10 +33,10 @@ pmat = data.frame( # Input: Nx2 data.frame (date, price)
       # 2. data.table standalone function
       dtfun = function(mat){
         dt = setNames(as.data.table(mat), c('V1', 'V2'))
-        dt[, last(V2), .(Month = as.yearmon(V1))][, .(Month, Return = V1/shift(V1, fill = first(mat[, 2])) - 1)]
+        dt[, .(EOM = last(V2)), .(Month = as.yearmon(V1))][, .(Month, Return = EOM/shift(EOM, fill = first(mat[, 2])) - 1)]
       }
       
-      # 3. quantmod (black box external function)
+      # 3. quantmod (black box library)
       qmfun = function(mat){
         qmdf = as.xts(mat[, 2], order.by = mat[, 1])
         monthlyReturn(qmdf)
@@ -64,5 +64,5 @@ mbm = microbenchmark(
 mbm
 
 png('benchmark.png', width = 800, height = 600)
-autoplot(mbm, log = F, cex.lab = 1.5)
+autoplot(mbm, log = F)
 dev.off()
