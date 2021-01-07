@@ -16,7 +16,7 @@ library(quantmod)
 spot = 100
 r = 0.01
 sigma = 0.02
-N = 1e5
+N = 1e6
 
 pmat = data.frame( # Input: Nx2 data.frame (date, price)
     date = seq.Date(as.Date('1970-01-01'), by = 1, length.out = N),
@@ -26,8 +26,9 @@ pmat = data.frame( # Input: Nx2 data.frame (date, price)
       # 1. xts standalone function
       xtsfun = function(mat){
         xtsdf = as.xts(mat[, 2], order.by = mat[, 1])
-        dailyRet = xtsdf/lag.xts(xtsdf, na.pad = F) - 1
-        apply.monthly(dailyRet, function(x) tail(cumprod(x + 1) - 1, 1))
+        eom_prices = to.monthly(xtsdf)[, 4]
+        mret = eom_prices/lag.xts(eom_prices) - 1; mret[1] = eom_prices[1]/xtsdf[1] - 1
+        mret
       }
       
       # 2. data.table standalone function
@@ -58,11 +59,11 @@ mbm = microbenchmark(
   xts = xtsfun(pmat),
   data.table = dtfun(pmat),
   quantmod = qmfun(pmat),
-  times = 200
+  times = 20
 )
 
 mbm
 
-png('benchmark.png', width = 1400, height = 900)
+#png('benchmark.png', width = 800, height = 600)
 autoplot(mbm, log = F, cex.lab = 1.5)
-dev.off()
+#dev.off()
