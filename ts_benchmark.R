@@ -23,30 +23,31 @@ pmat = data.frame( # Input: Nx2 data.frame (date, price)
     price = spot * exp(cumsum((r - 0.5 * sigma**2) * 1/N + (sigma * (sqrt(1/N)) * rnorm(N, mean = 0, sd = 1))))
 )
 
-      # 1. xts
+      # 1. xts standalone function
       xtsfun = function(mat){
         xtsdf = as.xts(mat[, 2], order.by = mat[, 1])
         dailyRet = xtsdf/lag.xts(xtsdf, na.pad = F) - 1
         apply.monthly(dailyRet, function(x) tail(cumprod(x + 1) - 1, 1))
       }
       
-      # 2. quantmod (black box external function)
+      # 2. data.table standalone function
+      dtfun = function(mat){
+        dt = setNames(as.data.table(mat, key = colnames(mat)[1]), c('V1', 'V2'))
+        dt[, last(V2), .(Month = as.yearmon(V1))][, .(Month, Return = V1/shift(V1, fill = first(mat[, 2])) - 1)]
+      }
+      
+      # 3. quantmod (black box external function)
       qmfun = function(mat){
         qmdf = as.xts(mat[, 2], order.by = mat[, 1])
         monthlyReturn(qmdf)
       }
-      
-      # 3. data.table standalone (no helper functions)
-      dtfun = function(mat){
-        dt = setNames(as.data.table(mat, key = colnames(mat)[1]), c('V1', 'V2'))
-        dt[, dailyRet := V2/shift(V2, fill = V2[1]) - 1][, .(last(cumprod(1+dailyRet)-1)), .(as.yearmon(V1))]
-      }
 
 # Check 1 == 2 == 3:
 all.equal(
-    as.numeric(unlist(dtfun(pmat[1:100,])[, 2])),
-    as.numeric(xtsfun(pmat[1:100,])),
-    as.numeric(qmfun(pmat[1:100,]))
+    unlist(dtfun(pmat[1:1000,])[, Return]),
+    as.numeric(xtsfun(pmat[1:1000,])),
+    as.numeric(qmfun(pmat[1:1000,])),
+    scale = NULL
 )
     
 # Benchmark
@@ -55,13 +56,13 @@ gc()
 
 mbm = microbenchmark(
   xts = xtsfun(pmat),
-  quantmod = qmfun(pmat),
   data.table = dtfun(pmat),
+  quantmod = qmfun(pmat),
   times = 200
 )
 
 mbm
 
-png('benchmark.png', width = 750, height = 350)
-autoplot(mbm, log = F)
+png('benchmark.png', width = 1400, height = 900)
+autoplot(mbm, log = F, cex.lab = 1.5)
 dev.off()
