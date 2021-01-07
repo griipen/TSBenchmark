@@ -8,7 +8,6 @@ rm(list = ls()); gc()
 library(data.table) 
 library(zoo)
 library(xts)
-library(TTR)
 library(ggplot2)
 library(quantmod)
 
@@ -16,7 +15,7 @@ library(quantmod)
 spot = 100
 r = 0.01
 sigma = 0.02
-N = 1e6
+N = 1e5
 
 pmat = data.frame( # Input: Nx2 data.frame (date, price)
     date = seq.Date(as.Date('1970-01-01'), by = 1, length.out = N),
@@ -33,7 +32,7 @@ pmat = data.frame( # Input: Nx2 data.frame (date, price)
       
       # 2. data.table standalone function
       dtfun = function(mat){
-        dt = setNames(as.data.table(mat, key = colnames(mat)[1]), c('V1', 'V2'))
+        dt = setNames(as.data.table(mat), c('V1', 'V2'))
         dt[, last(V2), .(Month = as.yearmon(V1))][, .(Month, Return = V1/shift(V1, fill = first(mat[, 2])) - 1)]
       }
       
@@ -59,11 +58,11 @@ mbm = microbenchmark(
   xts = xtsfun(pmat),
   data.table = dtfun(pmat),
   quantmod = qmfun(pmat),
-  times = 20
+  times = 50
 )
 
 mbm
 
-#png('benchmark.png', width = 800, height = 600)
+png('benchmark.png', width = 800, height = 600)
 autoplot(mbm, log = F, cex.lab = 1.5)
-#dev.off()
+dev.off()
