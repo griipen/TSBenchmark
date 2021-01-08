@@ -13,4 +13,4 @@
 - Ubuntu 18.04
 
 ### Results
-![](./benchmark.png)
+<img src="./benchmark.png" width="480" height="480">

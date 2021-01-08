@@ -57,15 +57,32 @@ all.equal(
 library(microbenchmark)
 gc()
 
+runs = 50
+
 mbm = microbenchmark(
   xts = xtsfun(pmat),
   data.table = dtfun(pmat),
   quantmod = qmfun(pmat),
-  times = 50
+  times = runs
 )
 
-mbm
+# Visualisation
+setDT(mbm)
+mbm[, time := time*1e-6]
+nfun = mbm[, length(unique(expr))]
+trange = mbm[, c(0.8*min(time), 1.2*max(time))]
+headers = c("Min", "Q1", "Median", "Mean", "Q3", "Max")
+options(scipen = 999)
 
-png('benchmark.png', width = 800, height = 600)
-autoplot(mbm, log = F)
+png('benchmark.png')
+par(mfrow = c(nfun, 1), mar = c(3,1,3,11))
+mbm[, {
+  d = density(time)
+  stats = as.numeric(summary(time))
+  plot(x = d$x, y = d$y, xlim = trange, t = 'l', ylab = NULL, lwd = 2, col = 'coral3', main = paste0(expr, ' (', runs, ' runs, N = ', N, ')'))
+  mtext('Runtime (ms)', line = -2, adj = 1.25, cex = 0.8)
+  for (i in 1:length(stats)){mtext(headers[i], line = -(i+3), adj = 1.1, cex = 0.7)}
+  for (i in 1:length(stats)){mtext(round(stats[i], 2), line = -(i+3), adj = 1.25, cex = 0.7)}
+}, expr]
+
 dev.off()
