@@ -19,39 +19,38 @@ r = 0.01
 sigma = 0.02
 N = 1e6
 
-# Input data: Nx2 data.frame (date, price)
-pmat = data.frame( 
-    date = seq.Date(as.Date('1970-01-01'), by = 1, length.out = N),
-    price = spot * exp(cumsum((r - 0.5 * sigma**2) * 1/N + (sigma * (sqrt(1/N)) * rnorm(N, mean = 0, sd = 1))))
+# Input data: Nx2 object (date, price)
+pmat_dt = data.table( 
+    V1 = seq.Date(as.Date('1970-01-01'), by = 1, length.out = N),
+    V2 = spot * exp(cumsum((r - 0.5 * sigma**2) * 1/N + (sigma * (sqrt(1/N)) * rnorm(N, mean = 0, sd = 1))))
 )
+
+pmat_xts = as.xts.data.table(pmat_dt)
 
 # Output functions
 
       # 1. xts standalone function
-      xtsfun = function(mat){
-        xtsdf = as.xts(mat[, 2], order.by = mat[, 1])
+      xtsfun = function(xtsdf){
         eom_prices = to.monthly(xtsdf)[, 4]
         mret = eom_prices/lag.xts(eom_prices) - 1; mret[1] = eom_prices[1]/xtsdf[1] - 1
         mret
       }
       
       # 2. data.table standalone function
-      dtfun = function(mat){
-        dt = setNames(as.data.table(mat), c('V1', 'V2'))
-        dt[, .(EOM = last(V2)), .(Month = as.yearmon(V1))][, .(Month, Return = EOM/shift(EOM, fill = first(mat[, 2])) - 1)]
+      dtfun = function(datatable){
+        datatable[, .(EOM = last(V2)), .(Month = as.yearmon(V1))][, .(Month, Return = EOM/shift(EOM, fill = first(datatable[, 2])) - 1)]
       }
       
       # 3. quantmod (black box library)
-      qmfun = function(mat){
-        qmdf = as.xts(mat[, 2], order.by = mat[, 1])
-        monthlyReturn(qmdf)
+      qmfun = function(xtsdf){
+        monthlyReturn(xtsdf)
       }
 
 # Check 1 == 2 == 3:
 all.equal(
-    unlist(dtfun(pmat)[, Return]),
-    as.numeric(xtsfun(pmat)),
-    as.numeric(qmfun(pmat)),
+    unlist(dtfun(pmat_dt)[, Return]),
+    as.numeric(xtsfun(pmat_xts)),
+    as.numeric(qmfun(pmat_xts)),
     scale = NULL
 )
     
@@ -62,9 +61,9 @@ gc()
 runs = 100
 
 mbm = microbenchmark(
-  xts = xtsfun(pmat),
-  data.table = dtfun(pmat),
-  quantmod = qmfun(pmat),
+  xts = xtsfun(pmat_xts),
+  data.table = dtfun(pmat_dt),
+  quantmod = qmfun(pmat_xts),
   times = runs
 )
 
@@ -72,6 +71,8 @@ mbm = microbenchmark(
 setDT(mbm)
 mbm[, `:=`(time = as.numeric(time*1e-6), expr = as.character(expr))]
 ds = mbm[, .(list(density(time))), expr]
+
+ds = ds[order(expr)]
 
 tit = paste0('TS Benchmark Runtime Distributions (ms), ', 'N = ', N, ', ', runs, ' Runs.')
 p = plot_ly(type = 'scatter', mode = 'lines') %>% 
@@ -85,5 +86,3 @@ for (i in ds$expr){
 }
 
 p
-
-saveWidget(p, file = 'benchmark.html')

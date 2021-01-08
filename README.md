@@ -13,4 +13,10 @@
 - Ubuntu 18.04
 
 ### Results
-<img src="./benchmark.png">
+<img src="./1e4.png">
+
+<img src="./1e5.png">
+
+<img src="./1e6.png">
+
+
