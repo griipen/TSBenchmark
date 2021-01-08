@@ -13,4 +13,4 @@
 - Ubuntu 18.04
 
 ### Results
-<img src="./benchmark.png" width="480" height="480">
+<img src="./benchmark.png" width="400" height="400">
