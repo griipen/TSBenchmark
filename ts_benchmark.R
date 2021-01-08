@@ -4,12 +4,14 @@
 # Three different functions: 1. xts, 2. data.table, 3. quantmod
 
 rm(list = ls()); gc()
+setwd("~/Documents/R/TSBenchmark")
 
 library(data.table) 
 library(zoo)
 library(xts)
-library(ggplot2)
 library(quantmod)
+library(plotly)
+library(htmlwidgets)
 
 # Random stock params
 spot = 100
@@ -57,7 +59,7 @@ all.equal(
 library(microbenchmark)
 gc()
 
-runs = 50
+runs = 100
 
 mbm = microbenchmark(
   xts = xtsfun(pmat),
@@ -68,21 +70,20 @@ mbm = microbenchmark(
 
 # Visualisation
 setDT(mbm)
-mbm[, time := time*1e-6]
-nfun = mbm[, length(unique(expr))]
-trange = mbm[, c(0.8*min(time), 1.2*max(time))]
-headers = c("Min", "Q1", "Median", "Mean", "Q3", "Max")
-options(scipen = 999)
+mbm[, `:=`(time = as.numeric(time*1e-6), expr = as.character(expr))]
+ds = mbm[, .(list(density(time))), expr]
 
-png('benchmark.png')
-par(mfrow = c(nfun, 1), mar = c(3,1,3,11))
-mbm[, {
-  d = density(time)
-  stats = as.numeric(summary(time))
-  plot(x = d$x, y = d$y, xlim = trange, t = 'l', ylab = NULL, lwd = 2, col = 'coral3', main = paste0(expr, ' (', runs, ' runs, N = ', N, ')'))
-  mtext('Runtime (ms)', line = -2, adj = 1.25, cex = 0.8)
-  for (i in 1:length(stats)){mtext(headers[i], line = -(i+3), adj = 1.1, cex = 0.7)}
-  for (i in 1:length(stats)){mtext(round(stats[i], 2), line = -(i+3), adj = 1.25, cex = 0.7)}
-}, expr]
+tit = paste0('TS Benchmark Runtime Distributions (ms), ', 'N = ', N, ', ', runs, ' Runs.')
+p = plot_ly(type = 'scatter', mode = 'lines') %>% 
+    layout(title = tit, legend = list(orientation = 'h')) %>%
+    config(displaylogo = F)
 
-dev.off()
+for (i in ds$expr){
+  x = ds[expr == i, V1[[1]]$x]
+  y = ds[expr == i, V1[[1]]$y]
+  p = p %>% add_trace(x = x, y = y, name = i, fill = 'tozeroy')
+}
+
+p
+
+saveWidget(p, file = 'benchmark.html')
