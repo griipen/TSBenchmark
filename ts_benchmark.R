@@ -12,20 +12,22 @@ library(xts)
 library(quantmod)
 library(plotly)
 library(htmlwidgets)
+library(dplyr)
 
 # Random stock params
 spot = 100
 r = 0.01
 sigma = 0.02
-N = 1e6
+N = 1e4
 
 # Input data: Nx2 object (date, price)
-pmat_dt = data.table( 
+pmat = data.frame( 
     V1 = seq.Date(as.Date('1970-01-01'), by = 1, length.out = N),
     V2 = spot * exp(cumsum((r - 0.5 * sigma**2) * 1/N + (sigma * (sqrt(1/N)) * rnorm(N, mean = 0, sd = 1))))
 )
 
-pmat_xts = as.xts.data.table(pmat_dt)
+pmat_dt = data.table(pmat)
+pmat_xts = xts(pmat[,2], order.by = pmat[,1])
 
 # Output functions
 
@@ -37,19 +39,30 @@ pmat_xts = as.xts.data.table(pmat_dt)
       }
       
       # 2. data.table standalone function
-      dtfun = function(datatable){
-        datatable[, .(EOM = last(V2)), .(Month = as.yearmon(V1))][, .(Month, Return = EOM/shift(EOM, fill = first(datatable[, 2])) - 1)]
+      dtfun = function(dt){
+        dt[, .(EOM = last(V2)), .(Month = as.yearmon(V1))][, .(Month, Return = EOM/shift(EOM, fill = dt[, first(V2)]) - 1)]
       }
       
-      # 3. quantmod (black box library)
+      # 3. dplyr standalone function
+      tidyfun = function(df){
+        df %>% 
+          group_by(Month = as.yearmon(V1)) %>% 
+          slice(n()) %>% 
+          ungroup() %>%
+          mutate(Return = V2/lag(V2, default = df[1, 2]) - 1) %>% 
+          select(Month, Return)
+      }
+      
+      # 4. quantmod (black box library)
       qmfun = function(xtsdf){
         monthlyReturn(xtsdf)
       }
 
 # Check 1 == 2 == 3:
 all.equal(
-    unlist(dtfun(pmat_dt)[, Return]),
     as.numeric(xtsfun(pmat_xts)),
+    unlist(dtfun(pmat_dt)[, Return]),
+    tidyfun(pmat)$Return,
     as.numeric(qmfun(pmat_xts)),
     scale = NULL
 )
@@ -63,6 +76,7 @@ runs = 100
 mbm = microbenchmark(
   xts = xtsfun(pmat_xts),
   data.table = dtfun(pmat_dt),
+  dplyr = tidyfun(pmat),
   quantmod = qmfun(pmat_xts),
   times = runs
 )
@@ -70,9 +84,7 @@ mbm = microbenchmark(
 # Visualisation
 setDT(mbm)
 mbm[, `:=`(time = as.numeric(time*1e-6), expr = as.character(expr))]
-ds = mbm[, .(list(density(time))), expr]
-
-ds = ds[order(expr)]
+ds = mbm[, .(list(density(time))), expr][order(expr)]
 
 tit = paste0('TS Benchmark Runtime Distributions (ms), ', 'N = ', N, ', ', runs, ' Runs.')
 p = plot_ly(type = 'scatter', mode = 'lines') %>% 
