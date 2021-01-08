@@ -4,7 +4,7 @@
 ### Task
 *Transform a daily price time-series object to monthly returns.*
 
-- **Input**: Nx2 data.frame (N days), columns *Date* and *Price*
+- **Input**: Nx2 object (N days), columns *Date* and *Price*
 - **Output**: Mx2 object (M months), columns *Month* and *Return*
 
 ### Hardware
