@@ -13,21 +13,7 @@ library(quantmod)
 library(plotly)
 library(htmlwidgets)
 library(dplyr)
-
-# Random stock params
-spot = 100
-r = 0.01
-sigma = 0.02
-N = 1e4
-
-# Input data: Nx2 object (date, price)
-pmat = data.frame( 
-    V1 = seq.Date(as.Date('1970-01-01'), by = 1, length.out = N),
-    V2 = spot * exp(cumsum((r - 0.5 * sigma**2) * 1/N + (sigma * (sqrt(1/N)) * rnorm(N, mean = 0, sd = 1))))
-)
-
-pmat_dt = data.table(pmat)
-pmat_xts = xts(pmat[,2], order.by = pmat[,1])
+library(tictoc)
 
 # Output functions
 
@@ -53,48 +39,80 @@ pmat_xts = xts(pmat[,2], order.by = pmat[,1])
           select(Month, Return)
       }
       
-      # 4. quantmod (black box library)
+      # 4. base R
+      basefun = function(df){
+        out = aggregate(df, list(Month = as.yearmon(df$V1)), function(x) tail(x, 1))[, -2]
+        out$Return = out$V2/c(df[1,2], out$V2[-nrow(out)]) - 1
+        out[, -2]
+      }
+      
+      # 5. quantmod (black box library)
       qmfun = function(xtsdf){
         monthlyReturn(xtsdf)
       }
 
-# Check 1 == 2 == 3:
-all.equal(
-    as.numeric(xtsfun(pmat_xts)),
-    unlist(dtfun(pmat_dt)[, Return]),
-    tidyfun(pmat)$Return,
-    as.numeric(qmfun(pmat_xts)),
-    scale = NULL
-)
+# Benchmark size
+size = c(1e3, 1e4, 1e5, 1e6)
+
+# Initiate Benchmark
+plist = lapply(size, function(N){
+  
+    # Input data: Nx2 object (date, price)
+    spot = 100
+    r = 0.01
+    sigma = 0.02
     
-# Benchmark
-library(microbenchmark)
-gc()
+    pmat = data.frame( 
+      V1 = seq.Date(as.Date('1970-01-01'), by = 1, length.out = N),
+      V2 = spot * exp(cumsum((r - 0.5 * sigma**2) * 1/N + (sigma * (sqrt(1/N)) * rnorm(N, mean = 0, sd = 1))))
+    )
+    
+    pmat_dt = data.table(pmat)
+    pmat_xts = xts(pmat[,2], order.by = pmat[,1])
+    
+    # Verify output equivalence:
+    all.equal(
+      as.numeric(xtsfun(pmat_xts)),
+      unlist(dtfun(pmat_dt)[, Return]),
+      tidyfun(pmat)$Return,
+      basefun(pmat)$Return,
+      as.numeric(qmfun(pmat_xts)),
+      scale = NULL
+    )
+    
+    # Benchmark
+    library(microbenchmark)
+    options(scipen = 999)
+    gc()
+    
+    runs = 100
+    
+    tic()
+    mbm = microbenchmark(
+      xts = xtsfun(pmat_xts),
+      data.table = dtfun(pmat_dt),
+      dplyr = tidyfun(pmat),
+      base = basefun(pmat),
+      quantmod = qmfun(pmat_xts),
+      times = runs
+    )
+    time = capture.output(toc())
+    
+    # Visualisation
+    setDT(mbm)
+    mbm[, `:=`(time = as.numeric(time*1e-6), expr = as.character(expr))]
+    ds = mbm[, .(list(density(time))), expr][order(expr)]
+    
+    tit = paste0('Runtime (ms, log scale), ', 'N = ', N, ', ', runs, ' Runs. Time Elapsed: ', gsub(" elapsed", "", time))
+    p = plot_ly(type = 'scatter', mode = 'lines') %>% 
+        layout(title = tit, legend = list(orientation = 'h'), xaxis = list(type = "log"), margin = list(t = 100)) %>%
+        config(displaylogo = F)
+    
+    for (i in ds$expr){
+      x = ds[expr == i, V1[[1]]$x]
+      y = ds[expr == i, V1[[1]]$y]
+      p = p %>% add_trace(x = x, y = y, name = i, fill = 'tozeroy')
+    }
+    p
 
-runs = 100
-
-mbm = microbenchmark(
-  xts = xtsfun(pmat_xts),
-  data.table = dtfun(pmat_dt),
-  dplyr = tidyfun(pmat),
-  quantmod = qmfun(pmat_xts),
-  times = runs
-)
-
-# Visualisation
-setDT(mbm)
-mbm[, `:=`(time = as.numeric(time*1e-6), expr = as.character(expr))]
-ds = mbm[, .(list(density(time))), expr][order(expr)]
-
-tit = paste0('TS Benchmark Runtime Distributions (ms), ', 'N = ', N, ', ', runs, ' Runs.')
-p = plot_ly(type = 'scatter', mode = 'lines') %>% 
-    layout(title = tit, legend = list(orientation = 'h')) %>%
-    config(displaylogo = F)
-
-for (i in ds$expr){
-  x = ds[expr == i, V1[[1]]$x]
-  y = ds[expr == i, V1[[1]]$y]
-  p = p %>% add_trace(x = x, y = y, name = i, fill = 'tozeroy')
-}
-
-p
+})

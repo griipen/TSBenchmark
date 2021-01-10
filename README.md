@@ -12,6 +12,7 @@
 - xts
 - data.table
 - dplyr
+- base
 - quantmod
 
 ### Hardware
@@ -20,6 +21,9 @@
 - Ubuntu 18.04 LTS
 
 ### Results
+
+<img src="./1e3.png" height="450" width="700">
+
 <img src="./1e4.png" height="450" width="700">
 
 <img src="./1e5.png" height="450" width="700">
