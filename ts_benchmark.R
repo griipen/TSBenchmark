@@ -1,7 +1,10 @@
-# Simple return exercise: Daily Prices to Monthly Returns
-# Input: Nx2 data.frame with columns (day, price) 
-# Output: Nx2 object with columns (month, return)
-# Three different functions: 1. xts, 2. data.table, 3. quantmod
+# TSBenchmark: Performance Benchmarking of TS libraries in R
+# --- https://github.com/griipen/TSBenchmark
+# --- Author: Jacob GRAPENDAL (jacob@grapendal.eu)
+
+# Simple period return conversion: Daily Prices to Monthly Returns
+# --- Input: Nx2 object with columns (day, price) 
+# --- Output: Nx2 object with columns (month, return)
 
 rm(list = ls()); gc()
 setwd("~/Documents/R/TSBenchmark")
@@ -26,7 +29,7 @@ library(tictoc)
       
       # 2. data.table standalone function
       dtfun = function(dt){
-        dt[, .(EOM = last(V2)), .(Month = as.yearmon(V1))][, .(Month, Return = EOM/shift(EOM, fill = dt[, first(V2)]) - 1)]
+        dt[, .(EOM = last(V2)), .(Month = as.integer(V1/100L))][, .(Month, Return = EOM/shift(EOM, fill = dt[, first(V2)]) - 1)]
       }
       
       # 3. dplyr standalone function
@@ -46,32 +49,32 @@ library(tictoc)
         out[, -2]
       }
       
-      # 5. quantmod (black box library)
+      # 5. quantmod (black box)
       qmfun = function(xtsdf){
         monthlyReturn(xtsdf)
       }
 
 # Benchmark size
-size = c(1e3, 1e4, 1e5, 1e6)
+size = c(1e4, 1e5, 1e6)
 
 # Initiate Benchmark
 plist = lapply(size, function(N){
-  
-    # Input data: Nx2 object (date, price)
+    
+    # Asset params
     spot = 100
     r = 0.01
     sigma = 0.02
     
-    pmat = data.frame( 
+    pmat = data.frame( # base/dplyr input format
       V1 = seq.Date(as.Date('1970-01-01'), by = 1, length.out = N),
       V2 = spot * exp(cumsum((r - 0.5 * sigma**2) * 1/N + (sigma * (sqrt(1/N)) * rnorm(N, mean = 0, sd = 1))))
     )
     
-    pmat_dt = data.table(pmat)
-    pmat_xts = xts(pmat[,2], order.by = pmat[,1])
+    pmat_dt = data.table(pmat)[, V1 := as.integer(gsub('-', '', V1))] # data.table input format
+    pmat_xts = xts(pmat[,2], order.by = pmat[,1]) # xts/quantmod input format
     
     # Verify output equivalence:
-    all.equal(
+    eqv = all.equal(
       as.numeric(xtsfun(pmat_xts)),
       unlist(dtfun(pmat_dt)[, Return]),
       tidyfun(pmat)$Return,
@@ -79,6 +82,9 @@ plist = lapply(size, function(N){
       as.numeric(qmfun(pmat_xts)),
       scale = NULL
     )
+    
+    if((eqv)) {print('Function outputs equivalent, starting benchmark')}
+    else {print('Function outputs differ, please revise'); return()}
     
     # Benchmark
     library(microbenchmark)
@@ -116,3 +122,6 @@ plist = lapply(size, function(N){
     p
 
 })
+
+saveRDS(plist, 'figs.RDS')
+plist
