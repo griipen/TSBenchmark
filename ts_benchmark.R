@@ -58,70 +58,65 @@ library(tictoc)
 size = c(1e4, 1e5, 1e6)
 
 # Initiate Benchmark
-plist = lapply(size, function(N){
+bmlist = rbindlist(lapply(size, function(N){
     
-    # Asset params
-    spot = 100
-    r = 0.01
-    sigma = 0.02
-    
-    pmat = data.frame( # base/dplyr input format
-      V1 = seq.Date(as.Date('1970-01-01'), by = 1, length.out = N),
-      V2 = spot * exp(cumsum((r - 0.5 * sigma**2) * 1/N + (sigma * (sqrt(1/N)) * rnorm(N, mean = 0, sd = 1))))
-    )
-    
-    pmat_dt = data.table(pmat)[, V1 := as.integer(gsub('-', '', V1))] # data.table input format
-    pmat_xts = xts(pmat[,2], order.by = pmat[,1]) # xts/quantmod input format
-    
-    # Verify output equivalence:
-    eqv = all.equal(
-      as.numeric(xtsfun(pmat_xts)),
-      unlist(dtfun(pmat_dt)[, Return]),
-      tidyfun(pmat)$Return,
-      basefun(pmat)$Return,
-      as.numeric(qmfun(pmat_xts)),
-      scale = NULL
-    )
-    
-    if((eqv)) {print('Function outputs equivalent, starting benchmark')}
-    else {print('Function outputs differ, please revise'); return()}
-    
-    # Benchmark
-    library(microbenchmark)
-    options(scipen = 999)
-    gc()
-    
-    runs = 100
-    
-    tic()
-    mbm = microbenchmark(
-      xts = xtsfun(pmat_xts),
-      data.table = dtfun(pmat_dt),
-      dplyr = tidyfun(pmat),
-      base = basefun(pmat),
-      quantmod = qmfun(pmat_xts),
-      times = runs
-    )
-    time = capture.output(toc())
-    
-    # Visualisation
-    setDT(mbm)
-    mbm[, `:=`(time = as.numeric(time*1e-6), expr = as.character(expr))]
-    ds = mbm[, .(list(density(time))), expr][order(expr)]
-    
-    tit = paste0('Runtime (ms, log scale), ', 'N = ', N, ', ', runs, ' Runs. Time Elapsed: ', gsub(" elapsed", "", time))
-    p = plot_ly(type = 'scatter', mode = 'lines') %>% 
-        layout(title = tit, legend = list(orientation = 'h'), xaxis = list(type = "log"), margin = list(t = 100)) %>%
-        config(displaylogo = F)
-    
-    for (i in ds$expr){
-      x = ds[expr == i, V1[[1]]$x]
-      y = ds[expr == i, V1[[1]]$y]
-      p = p %>% add_trace(x = x, y = y, name = i, fill = 'tozeroy')
-    }
-    p
+      # Asset params
+      spot = 100
+      r = 0.01
+      sigma = 0.02
+      
+      pmat = data.frame( # base/dplyr input format
+        V1 = seq.Date(as.Date('1970-01-01'), by = 1, length.out = N),
+        V2 = spot * exp(cumsum((r - 0.5 * sigma**2) * 1/N + (sigma * (sqrt(1/N)) * rnorm(N, mean = 0, sd = 1))))
+      )
+      
+      pmat_dt = data.table(pmat)[, V1 := as.integer(gsub('-', '', V1))] # data.table input format
+      pmat_xts = xts(pmat[,2], order.by = pmat[,1]) # xts/quantmod input format
+      
+      # Verify output equivalence:
+      eqv = all.equal(
+        as.numeric(xtsfun(pmat_xts)),
+        unlist(dtfun(pmat_dt)[, Return]),
+        tidyfun(pmat)$Return,
+        basefun(pmat)$Return,
+        as.numeric(qmfun(pmat_xts)),
+        scale = NULL
+      )
+      
+      if((eqv)) {
+        print('Function outputs equivalent, starting benchmark')} else {print('Function outputs differ, please revise'); return()}
+      
+      # Benchmark
+      library(microbenchmark)
+      options(scipen = 999)
+      gc()
+      
+      runs = 100
+      
+      mbm = microbenchmark(
+        xts = xtsfun(pmat_xts),
+        data.table = dtfun(pmat_dt),
+        dplyr = tidyfun(pmat),
+        base = basefun(pmat),
+        quantmod = qmfun(pmat_xts),
+        times = runs
+      )
+      
+      setDT(mbm)
+      mbm[, `:=`(time = as.numeric(time*1e-6), expr = as.character(expr), N = N)]
+}))
 
-})
+x = factor(bmlist$expr, levels = c('data.table', 'quantmod', 'xts', 'dplyr', 'base'))
+y = bmlist$time
+col = as.factor(bmlist$N)
 
-saveRDS(plist, 'figs.RDS')
-plist
+p = plot_ly(x = ~x, y = ~y, color = ~col, type = 'box') %>% 
+    layout(title = 'TS Benchmark Results (100 runs)', boxmode = 'group', 
+           xaxis = list(title = ''), 
+           yaxis = list(type = "log", title = 'ms, log scale'),
+           margin = list(t = 100),
+           legend = list(title = list(text = '<b>   Input N</b>')))
+
+saveRDS(p, 'fig.RDS')
+saveWidget(p, 'TSBenchmark.html')
+

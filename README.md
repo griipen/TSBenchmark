@@ -22,10 +22,7 @@
 
 ### Results
 
-<img src="./1e4.png" height="450" width="700">
+<img src="./fig.png" height="781" width="716">
 
-<img src="./1e5.png" height="450" width="700">
-
-<img src="./1e6.png" height="450" width="700">
 
 
