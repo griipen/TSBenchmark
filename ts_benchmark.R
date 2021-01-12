@@ -112,13 +112,12 @@ x = factor(bmlist$expr, levels = c('data.table', 'xts', 'quantmod', 'dplyr', 'ba
 y = bmlist$time
 col = as.factor(bmlist$N)
 
-p = plot_ly(x = ~x, y = ~y, color = ~col, type = 'box') %>% 
-    layout(title = 'TS Benchmark Results (100 runs)', boxmode = 'group', 
-           xaxis = list(title = ''), 
+p = plot_ly(x = ~x, y = ~y, color = ~col, type = 'box') %>%
+    config(displaylogo = F) %>%
+    layout(boxmode = 'group',
+           xaxis = list(title = NA), 
            yaxis = list(type = "log", title = 'ms, log scale'),
-           margin = list(t = 100),
            legend = list(title = list(text = '<b>   Input N</b>')))
 
-saveRDS(p, 'fig.RDS')
+saveRDS(bmlist, 'benchmarkdata.RDS')
 saveWidget(p, 'TSBenchmark.html')
-

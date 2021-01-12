@@ -8,7 +8,6 @@
 - **Output**: Mx2 object (M months), columns *Month* and *Return*
 
 ### Current Implementations
-
 - xts
 - data.table
 - dplyr
