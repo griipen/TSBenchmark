@@ -22,8 +22,10 @@ library(tictoc)
 
       # 1. xts standalone function
       xtsfun = function(xtsdf){
-        eom_prices = to.monthly(xtsdf)[, 4]
-        mret = eom_prices/lag.xts(eom_prices) - 1; mret[1] = eom_prices[1]/xtsdf[1] - 1
+        eom_prices = xtsdf[endpoints(xtsdf, "months"),]
+        tclass(eom_prices) = "yearmon"
+        mret = eom_prices/lag.xts(eom_prices) - 1
+        mret[1] = eom_prices[1]/coredata(xtsdf[1]) - 1 
         mret
       }
       
@@ -49,7 +51,7 @@ library(tictoc)
         out[, -2]
       }
       
-      # 5. quantmod (black box)
+      # 5. quantmod
       qmfun = function(xtsdf){
         monthlyReturn(xtsdf)
       }
@@ -59,7 +61,7 @@ size = c(1e4, 1e5, 1e6)
 
 # Initiate Benchmark
 bmlist = rbindlist(lapply(size, function(N){
-    
+  
       # Asset params
       spot = 100
       r = 0.01
@@ -106,7 +108,7 @@ bmlist = rbindlist(lapply(size, function(N){
       mbm[, `:=`(time = as.numeric(time*1e-6), expr = as.character(expr), N = N)]
 }))
 
-x = factor(bmlist$expr, levels = c('data.table', 'quantmod', 'xts', 'dplyr', 'base'))
+x = factor(bmlist$expr, levels = c('data.table', 'xts', 'quantmod', 'dplyr', 'base'))
 y = bmlist$time
 col = as.factor(bmlist$N)
 

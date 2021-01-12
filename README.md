@@ -21,8 +21,10 @@
 - Ubuntu 18.04 LTS
 
 ### Results
+<img src="./fig.png" height="736" width="745">
 
-<img src="./fig.png" height="781" width="716">
-
+### Credits
+- <a href="https://github.com/mattdowle">@mattdowle</a>: Integer-based month grouping for the *data.table* solution
+- <a href="https://github.com/joshuaulrich">@joshuaulrich</a>: Improved *xts* solution
 
 
